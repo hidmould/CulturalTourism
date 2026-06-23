@@ -2,15 +2,19 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "智慧文旅 - AI驱动的智慧旅游助手"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "智慧文旅"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "智慧文旅"
+    },
+    {
+      "name": "internet_permission_reason",
+      "value": "需要网络权限用于AI对话和天气查询服务"
     }
   ]
 }

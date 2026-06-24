@@ -4,6 +4,7 @@
 import { HttpClient } from '../network/HttpClient'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { util } from '@kit.ArkTS'
+import { http } from '@kit.NetworkKit'
 import { DatabaseHelper } from '../database/DatabaseHelper'
 import { ChatMessage, Conversation } from '../model/Models'
 import { relationalStore } from '@kit.ArkData'
@@ -19,6 +20,7 @@ import {
 export class ChatService {
   private static instance: ChatService
   private currentModelType: ModelType = ModelType.GENERAL
+  private activeHttpRequest: http.HttpRequest | null = null
 
   static getInstance(): ChatService {
     if (!ChatService.instance) {
@@ -243,6 +245,40 @@ export class ChatService {
   }
 
   /**
+   * 取消正在进行的流式请求
+   */
+  cancelStream(): void {
+    if (this.activeHttpRequest) {
+      try {
+        this.activeHttpRequest.destroy()
+      } catch (e) {
+        // 忽略销毁错误
+      }
+      this.activeHttpRequest = null
+    }
+  }
+
+  /**
+   * 是否有正在进行的流式请求
+   */
+  isStreaming(): boolean {
+    return this.activeHttpRequest !== null
+  }
+
+  /**
+   * 更新消息内容（用于将部分内容替换为完整内容）
+   */
+  async updateMessage(msgId: number, content: string): Promise<void> {
+    let store = await DatabaseHelper.getInstance().getStore()
+    let valueBucket: relationalStore.ValuesBucket = {
+      'content': content
+    }
+    let predicates = new relationalStore.RdbPredicates(TABLE_MESSAGE)
+    predicates.equalTo('id', msgId)
+    await store.update(valueBucket, predicates)
+  }
+
+  /**
    * 流式发送消息到大模型
    * @param convId 对话ID
    * @param messages 上下文消息数组
@@ -273,6 +309,7 @@ export class ChatService {
 
     let streamReq = HttpClient.getInstance().createStreamRequest(headers)
     let httpRequest = streamReq.request
+    this.activeHttpRequest = httpRequest
     let options = streamReq.options
     options.extraData = body
     let fullContent = ''
@@ -285,6 +322,7 @@ export class ChatService {
       if (!hasReceivedData && !hasError) {
         hasError = true
         httpRequest.destroy()
+        this.activeHttpRequest = null
         onError('请求超时，请检查网络连接或API配置')
       }
     }, 15000)
@@ -294,6 +332,7 @@ export class ChatService {
       if (!hasDone && !hasError) {
         hasError = true
         httpRequest.destroy()
+        this.activeHttpRequest = null
         if (fullContent.length > 0) {
           onDone(fullContent)
         } else {
@@ -324,6 +363,7 @@ export class ChatService {
               clearTimeout(firstByteTimeoutId)
               clearTimeout(totalTimeoutId)
               httpRequest.destroy()
+              this.activeHttpRequest = null
               onDone(fullContent)
             }
             return
@@ -356,6 +396,7 @@ export class ChatService {
       clearTimeout(firstByteTimeoutId)
       clearTimeout(totalTimeoutId)
       httpRequest.destroy()
+      this.activeHttpRequest = null
       onDone(fullContent)
     })
 
@@ -365,8 +406,14 @@ export class ChatService {
         clearTimeout(firstByteTimeoutId)
         clearTimeout(totalTimeoutId)
         httpRequest.destroy()
-        let error = err as BusinessError
-        onError(`网络请求失败: ${error.message || JSON.stringify(err)}`)
+        this.activeHttpRequest = null
+        // 如果有已接收的部分内容，仍然通过 onDone 保存，而不是直接报错
+        if (fullContent.length > 0) {
+          onDone(fullContent)
+        } else {
+          let error = err as BusinessError
+          onError(`网络请求失败: ${error.message || JSON.stringify(err)}`)
+        }
       }
     })
   }

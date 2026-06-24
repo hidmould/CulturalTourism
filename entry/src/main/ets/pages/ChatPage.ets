@@ -19,6 +19,39 @@ interface MessageItem {
   createTime: number
 }
 
+/**
+ * 清理 AI 回复中的 Markdown 格式符号，转为纯文本显示
+ */
+function cleanMarkdown(text: string): string {
+  let result = text
+  // 标题: ### **text** 或 ## text
+  result = result.replace(/^#{1,6}\s+/gm, '')
+  // 粗体/斜体: **text** 或 __text__ 或 *text*
+  result = result.replace(/\*\*(.+?)\*\*/g, '$1')
+  result = result.replace(/__(.+?)__/g, '$1')
+  result = result.replace(/\*(.+?)\*/g, '$1')
+  result = result.replace(/_(.+?)_/g, '$1')
+  // 删除线: ~~text~~
+  result = result.replace(/~~(.+?)~~/g, '$1')
+  // 行内代码: `code`
+  result = result.replace(/`(.+?)`/g, '$1')
+  // 链接: [text](url) -> text
+  result = result.replace(/\[(.+?)\]\(.+?\)/g, '$1')
+  // 图片: ![alt](url) -> alt
+  result = result.replace(/!\[(.+?)\]\(.+?\)/g, '$1')
+  // 无序列表符号: - item 或 * item（行首）
+  result = result.replace(/^\s*[-*]\s+/gm, '')
+  // 有序列表符号: 1. item（行首）
+  result = result.replace(/^\s*\d+\.\s+/gm, '')
+  // 分隔线: --- 或 *** 或 ___（单独一行）
+  result = result.replace(/^\s*[-*_]{3,}\s*$/gm, '')
+  // 块引用: > text
+  result = result.replace(/^>\s+/gm, '')
+  // 清理多余空行（连续3个以上换行缩为2个）
+  result = result.replace(/\n{3,}/g, '\n\n')
+  return result.trim()
+}
+
 @Entry
 @Component
 struct ChatPage {
@@ -31,8 +64,11 @@ struct ChatPage {
   @State showModelPicker: boolean = false
   @State showActionSheet: boolean = false
   @State selectedMessage: MessageItem | null = null
+  private isPageAlive: boolean = true
+  private partialAssistantMsgId: number = 0
   private conversationId: number = 0
   private scroller: Scroller = new Scroller()
+  private reloadTimer: number = 0
   private context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext
 
   aboutToAppear(): void {
@@ -44,15 +80,45 @@ struct ChatPage {
     this.loadMessages()
   }
 
+  aboutToDisappear(): void {
+    // 退出时若正在流式输出，将部分内容存入数据库，确保用户回来时能看到
+    if (this.isStreaming && this.streamingContent.length > 0) {
+      this.savePartialContent()
+    }
+    this.isPageAlive = false
+    // 清除轮询定时器
+    if (this.reloadTimer > 0) {
+      clearTimeout(this.reloadTimer)
+      this.reloadTimer = 0
+    }
+    // 不取消流式请求，让其在后台继续完成
+  }
+
+  async savePartialContent(): Promise<void> {
+    try {
+      let partialId = await ChatService.getInstance().saveMessage(
+        this.conversationId, MessageRole.ASSISTANT, this.streamingContent
+      )
+      this.partialAssistantMsgId = partialId
+    } catch (err) {
+      // 忽略保存失败
+    }
+  }
+
   async loadMessages(): Promise<void> {
     let msgs = await ChatService.getInstance().getMessages(this.conversationId)
     let items: MessageItem[] = []
     for (let i = 0; i < msgs.length; i++) {
       let m = msgs[i]
+      let content = m.content
+      // 清理 AI 回复中的 Markdown 格式符号
+      if (m.role === MessageRole.ASSISTANT) {
+        content = cleanMarkdown(content)
+      }
       let item: MessageItem = {
         id: m.id,
         role: m.role,
-        content: m.content,
+        content: content,
         isStreaming: false,
         createTime: m.createTime
       }
@@ -60,6 +126,16 @@ struct ChatPage {
     }
     this.messages = items
     this.scrollToBottom()
+
+    // 如果流式请求仍在后台进行，延迟重新加载以获取完整内容
+    if (ChatService.getInstance().isStreaming()) {
+      this.reloadTimer = setTimeout(() => {
+        if (this.isPageAlive) {
+          this.reloadTimer = 0
+          this.loadMessages()
+        }
+      }, 2000)
+    }
   }
 
   build() {
@@ -480,30 +556,67 @@ struct ChatPage {
         this.conversationId,
         contextMessages,
         (delta: string) => {
+          if (!this.isPageAlive) return
           this.streamingContent += delta
           this.scrollToBottom()
         },
         async (fullContent: string) => {
-          // 保存助手消息
-          let assistantMsgId = await ChatService.getInstance().saveMessage(
-            this.conversationId, MessageRole.ASSISTANT, fullContent
-          )
-          this.messages.push({
-            id: assistantMsgId,
-            role: MessageRole.ASSISTANT,
-            content: fullContent,
-            isStreaming: false,
-            createTime: Date.now()
-          })
+          // 清理 AI 回复中的 Markdown 格式符号
+          let cleanContent = cleanMarkdown(fullContent)
+          let assistantMsgId: number
+
+          // 如果之前退出时已保存了部分内容，则更新该条消息；否则新建
+          if (this.partialAssistantMsgId > 0) {
+            try {
+              await ChatService.getInstance().updateMessage(this.partialAssistantMsgId, cleanContent)
+              assistantMsgId = this.partialAssistantMsgId
+            } catch (err) {
+              assistantMsgId = await ChatService.getInstance().saveMessage(
+                this.conversationId, MessageRole.ASSISTANT, cleanContent
+              )
+            }
+          } else {
+            assistantMsgId = await ChatService.getInstance().saveMessage(
+              this.conversationId, MessageRole.ASSISTANT, cleanContent
+            )
+          }
+
+          // 更新对话摘要
+          let summary = cleanContent.length > 50 ? cleanContent.substring(0, 50) + '...' : cleanContent
+          try {
+            await ChatService.getInstance().updateConversation(this.conversationId, '', summary)
+          } catch (err) {
+            // 忽略
+          }
+
+          // 仅页面存活时更新 UI 状态
+          if (!this.isPageAlive) return
+
+          // 检查是否已存在该消息（从部分加载而来），则更新而非追加
+          let existIdx = this.messages.findIndex(m => m.id === assistantMsgId)
+          if (existIdx >= 0) {
+            this.messages[existIdx] = {
+              id: assistantMsgId,
+              role: MessageRole.ASSISTANT,
+              content: cleanContent,
+              isStreaming: false,
+              createTime: Date.now()
+            }
+          } else {
+            this.messages.push({
+              id: assistantMsgId,
+              role: MessageRole.ASSISTANT,
+              content: cleanContent,
+              isStreaming: false,
+              createTime: Date.now()
+            })
+          }
           this.streamingContent = ''
           this.isStreaming = false
           this.isLoading = false
-
-          // 更新对话摘要
-          let summary = fullContent.length > 50 ? fullContent.substring(0, 50) + '...' : fullContent
-          await ChatService.getInstance().updateConversation(this.conversationId, '', summary)
         },
         (error: string) => {
+          if (!this.isPageAlive) return
           this.isStreaming = false
           this.isLoading = false
           promptAction.showToast({ message: error, duration: 2000 })

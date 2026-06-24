@@ -190,109 +190,175 @@ struct WeatherPage {
   @Builder
   buildCurrentWeather(info: WeatherInfo) {
     Column() {
-      // 日期
-      Text(this.currentDate)
-        .fontSize(12)
-        .fontColor('#999999')
-        .width('100%')
-        .textAlign(TextAlign.Start)
-
-      // 主要天气信息
+      // 日期和更新时间
       Row() {
-        Text(this.getWeatherIcon(info.weather))
-          .fontSize(56)
-          .margin({ right: 12 })
-
-        Column() {
-          Text(info.weather || '--')
-            .fontSize(18)
-            .fontColor('#333333')
-            .fontWeight(FontWeight.Medium)
-          Text(`${info.temperature}°C`)
-            .fontSize(42)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#333333')
-            .margin({ top: 4 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        Column() {
-          Text('湿度')
+        Text(this.currentDate)
+          .fontSize(13)
+          .fontColor('#666666')
+          .layoutWeight(1)
+        if (info.reportTime) {
+          Text(`更新: ${info.reportTime}`)
             .fontSize(11)
             .fontColor('#999999')
-          Text(`${info.humidity}%`)
-            .fontSize(18)
+        }
+      }
+      .width('100%')
+
+      // 主要天气信息区域
+      Row() {
+        // 左侧：天气图标和温度
+        Column() {
+          // 天气图标
+          Text(this.getWeatherIcon(info.weather))
+            .fontSize(72)
+            .margin({ bottom: 8 })
+
+          // 温度
+          Text(info.temperature ? `${info.temperature}°` : '--°')
+            .fontSize(56)
             .fontWeight(FontWeight.Bold)
             .fontColor('#1E90FF')
+
+          // 天气描述
+          Text(info.weather || '暂无数据')
+            .fontSize(16)
+            .fontColor('#666666')
             .margin({ top: 4 })
         }
         .alignItems(HorizontalAlign.Center)
-        .margin({ left: 8 })
+        .layoutWeight(1)
 
-        Column() {
-          Text('风力')
-            .fontSize(11)
-            .fontColor('#999999')
-          Text(`${info.windPower}级`)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FF9800')
-            .margin({ top: 4 })
+        // 右侧：详细数据
+        Column({ space: 16 }) {
+          // 湿度
+          Row({ space: 8 }) {
+            Text('💧')
+              .fontSize(20)
+            Column() {
+              Text('湿度')
+                .fontSize(11)
+                .fontColor('#999999')
+              Text(info.humidity ? `${info.humidity}%` : '--%')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#333333')
+            }
+            .alignItems(HorizontalAlign.Start)
+          }
+
+          // 风力
+          Row({ space: 8 }) {
+            Text('💨')
+              .fontSize(20)
+            Column() {
+              Text('风力')
+                .fontSize(11)
+                .fontColor('#999999')
+              Text(info.windPower ? `${info.windPower}级` : '--级')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#333333')
+            }
+            .alignItems(HorizontalAlign.Start)
+          }
+
+          // 风向
+          Row({ space: 8 }) {
+            Text('🧭')
+              .fontSize(20)
+            Column() {
+              Text('风向')
+                .fontSize(11)
+                .fontColor('#999999')
+              Text(info.windDirection || '--')
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#333333')
+            }
+            .alignItems(HorizontalAlign.Start)
+          }
         }
-        .alignItems(HorizontalAlign.Center)
-        .margin({ left: 16 })
+        .alignItems(HorizontalAlign.Start)
+        .padding({ left: 16 })
       }
       .width('100%')
-      .margin({ top: 12 })
-      .padding({ left: 4 })
+      .margin({ top: 16 })
 
-      // 风向
-      Row() {
-        Text('风向: ')
-          .fontSize(12)
-          .fontColor('#999999')
-        Text(info.windDirection || '--')
-          .fontSize(13)
-          .fontColor('#333333')
-          .fontWeight(FontWeight.Medium)
-        Blank()
-        Text('数据来源: 高德地图')
-          .fontSize(10)
-          .fontColor('#BBBBBB')
-      }
-      .width('100%')
-      .margin({ top: 12 })
-
-      // 昨日温差参考（取预报第一天的数据）
+      // 昼夜预报
       if (info.forecast.length > 0) {
         Row() {
-          Text('☀️ 白天: ')
-            .fontSize(12)
-            .fontColor('#FF8800')
-          Text(`${info.forecast[0].dayTemp}°C  ${info.forecast[0].dayWeather}  ${info.forecast[0].dayWind}风`)
-            .fontSize(12)
-            .fontColor('#333333')
-          Blank()
-          Text('🌙 夜间: ')
-            .fontSize(12)
-            .fontColor('#666666')
-          Text(`${info.forecast[0].nightTemp}°C  ${info.forecast[0].nightWeather}`)
-            .fontSize(12)
-            .fontColor('#333333')
+          // 白天
+          Column() {
+            Text('☀️ 白天')
+              .fontSize(12)
+              .fontColor('#FF8800')
+              .margin({ bottom: 4 })
+            Text(`${info.forecast[0].dayTemp}°`)
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FF8800')
+            Text(info.forecast[0].dayWeather)
+              .fontSize(12)
+              .fontColor('#666666')
+              .margin({ top: 2 })
+            Text(`${info.forecast[0].dayWind}风 ${info.forecast[0].dayPower}级`)
+              .fontSize(11)
+              .fontColor('#999999')
+              .margin({ top: 2 })
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Center)
+
+          Divider()
+            .vertical(true)
+            .height(60)
+            .color('#E0E0E0')
+
+          // 夜间
+          Column() {
+            Text(' 夜间')
+              .fontSize(12)
+              .fontColor('#6666CC')
+              .margin({ bottom: 4 })
+            Text(`${info.forecast[0].nightTemp}°`)
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#6666CC')
+            Text(info.forecast[0].nightWeather)
+              .fontSize(12)
+              .fontColor('#666666')
+              .margin({ top: 2 })
+            Text(`${info.forecast[0].nightWind}风 ${info.forecast[0].nightPower}级`)
+              .fontSize(11)
+              .fontColor('#999999')
+              .margin({ top: 2 })
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Center)
         }
         .width('100%')
-        .margin({ top: 8 })
-        .padding({ top: 8 })
-        .border({ width: 0.5, color: '#E0E0E0' })
+        .margin({ top: 16 })
+        .padding({ top: 16 })
+        .border({ width: 0.5, color: '#E8E8E8' })
       }
+
+      // 数据来源
+      Text('数据来源: 高德地图')
+        .fontSize(10)
+        .fontColor('#BBBBBB')
+        .width('100%')
+        .textAlign(TextAlign.End)
+        .margin({ top: 8 })
     }
     .width('94%')
-    .padding(16)
-    .backgroundColor('#FFFFFF')
-    .borderRadius(16)
+    .padding(20)
+    .linearGradient({
+      angle: 135,
+      colors: [['#E3F2FD', 0.0], ['#BBDEFB', 1.0]]
+    })
+    .borderRadius(20)
     .margin({ top: 12 })
-    .shadow({ radius: 6, color: '#15000000', offsetY: 3 })
+    .shadow({ radius: 8, color: '#20000000', offsetY: 4 })
   }
 
   @Builder

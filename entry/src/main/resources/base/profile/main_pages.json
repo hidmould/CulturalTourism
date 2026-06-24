@@ -1,13 +1,5 @@
 {
   "src": [
-    "pages/Index",
-    "pages/LoginPage",
-    "pages/ChatListPage",
-    "pages/ChatDetailPage",
-    "pages/ProfilePage",
-    "pages/SpotDiscoveryPage",
-    "pages/TripListPage",
-    "pages/TripDetailPage",
-    "pages/FavoriteListPage"
+    "pages/Index"
   ]
 }

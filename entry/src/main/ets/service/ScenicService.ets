@@ -25,11 +25,14 @@ export class ScenicService {
     predicates.orderByDesc('rating')
     let resultSet = await store.query(predicates)
 
+    console.info(`[ScenicService] 查询结果 rowCount: ${resultSet.rowCount}`)
+
     let list: ScenicSpot[] = []
     while (resultSet.goToNextRow()) {
       list.push(this.parseSpot(resultSet))
     }
     resultSet.close()
+    console.info(`[ScenicService] 解析景点数量: ${list.length}`)
     return list
   }
 

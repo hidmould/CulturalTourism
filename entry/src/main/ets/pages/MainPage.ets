@@ -289,8 +289,10 @@ struct DiscoverContent {
     this.isLoading = true
     try {
       this.spots = await ScenicService.getInstance().getAllSpots()
+      console.info(`[DiscoverContent] 加载景点完成，数量: ${this.spots.length}`)
     } catch (err) {
-      console.error('加载景点失败')
+      let error = err as Error
+      console.error(`[DiscoverContent] 加载景点失败: ${error.message}`)
     } finally {
       this.isLoading = false
     }
@@ -390,12 +392,53 @@ struct DiscoverContent {
       .height(44)
       .margin({ top: 4 })
 
+      // 结果统计
+      if (!this.isLoading && this.spots.length > 0) {
+        Row() {
+          Text(`共找到 ${this.spots.length} 个景点`)
+            .fontSize(11)
+            .fontColor('#999999')
+          Blank()
+          Text('按评分排序')
+            .fontSize(11)
+            .fontColor('#CCCCCC')
+        }
+        .width('92%')
+        .padding({ top: 8, bottom: 4 })
+      }
+
       // 景点列表
       if (this.isLoading) {
         LoadingProgress()
           .width(40)
           .height(40)
           .margin({ top: 80 })
+      } else if (this.spots.length === 0) {
+        Column() {
+          Text('🏞️')
+            .fontSize(48)
+            .margin({ top: 40 })
+          Text('暂无景点数据')
+            .fontSize(16)
+            .fontColor('#999999')
+            .margin({ top: 12 })
+          Text('数据加载异常，请清除应用数据后重试')
+            .fontSize(12)
+            .fontColor('#CCCCCC')
+            .margin({ top: 6 })
+          Button('重新加载')
+            .fontSize(13)
+            .height(36)
+            .backgroundColor('#1E90FF')
+            .fontColor('#FFFFFF')
+            .borderRadius(18)
+            .padding({ left: 24, right: 24 })
+            .margin({ top: 20 })
+            .onClick(() => { this.loadSpots() })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
       } else {
         List() {
           ForEach(this.spots, (spot: ScenicSpot) => {
@@ -438,9 +481,16 @@ struct DiscoverContent {
             .fontWeight(FontWeight.Medium)
             .fontColor('#333333')
           Blank()
-          Text(`${spot.rating}分`)
-            .fontSize(12)
-            .fontColor('#FF8800')
+          Row() {
+            Text('★')
+              .fontSize(12)
+              .fontColor('#FF8800')
+            Text(`${spot.rating}`)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FF8800')
+              .margin({ left: 2 })
+          }
         }
         .width('100%')
 
@@ -453,16 +503,21 @@ struct DiscoverContent {
           .width('100%')
 
         Row() {
+          Row() {
+            Text('📍')
+              .fontSize(10)
+            Text(spot.city)
+              .fontSize(10)
+              .fontColor('#999999')
+              .margin({ left: 2 })
+          }
+          Blank()
           Text(spot.category)
             .fontSize(10)
             .fontColor('#1E90FF')
             .backgroundColor('#E8F4FD')
             .borderRadius(4)
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          Text(spot.city)
-            .fontSize(10)
-            .fontColor('#999999')
-            .margin({ left: 8 })
         }
         .width('100%')
         .margin({ top: 8 })
@@ -475,6 +530,13 @@ struct DiscoverContent {
     .width('100%')
     .borderRadius(12)
     .shadow({ radius: 4, color: '#10000000', offsetY: 2 })
+    .onClick(() => {
+      AlertDialog.show({
+        title: spot.name,
+        message: `${spot.description}\n\n📍 地址：${spot.address}\n⭐ 评分：${spot.rating}分\n🏷️ 分类：${spot.category}`,
+        confirm: { value: '知道了', fontColor: '#1E90FF', action: () => {} }
+      })
+    })
   }
 
   getCategoryColor(category: string): string {

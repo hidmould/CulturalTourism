@@ -164,7 +164,7 @@ struct MainPage {
   buildConversationItem(item: Conversation) {
     Row() {
       Column() {
-        Text(item.title || '新对话')
+        Text(this.getDisplayTitle(item))
           .fontSize(15)
           .fontWeight(FontWeight.Medium)
           .fontColor('#333333')
@@ -240,6 +240,17 @@ struct MainPage {
     } catch (err) {
       console.error('搜索失败')
     }
+  }
+
+  getDisplayTitle(item: Conversation): string {
+    if (item.title && item.title !== '新对话') {
+      return item.title
+    }
+    if (item.summary && item.summary.trim().length > 0) {
+      let summary = item.summary.trim()
+      return summary.length > 12 ? summary.substring(0, 12) + '...' : summary
+    }
+    return '新对话'
   }
 
   formatTime(timestamp: number): string {

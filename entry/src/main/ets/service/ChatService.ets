@@ -62,10 +62,67 @@ export class ChatService {
    */
   async updateConversation(convId: number, title: string, summary: string): Promise<void> {
     let store = await DatabaseHelper.getInstance().getStore()
+    let valueBucket: relationalStore.ValuesBucket = {}
+    if (title !== undefined) {
+      valueBucket['title'] = title
+    }
+    if (summary !== undefined) {
+      valueBucket['summary'] = summary
+    }
+    valueBucket['last_message_time'] = Date.now()
+    let predicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+    predicates.equalTo('id', convId)
+    await store.update(valueBucket, predicates)
+  }
+
+  /**
+   * 根据消息内容生成对话标题（取第一条用户消息前12字）
+   */
+  async generateTitleFromMessages(convId: number): Promise<string> {
+    let msgs = await this.getMessages(convId)
+    for (let i = 0; i < msgs.length; i++) {
+      let msg = msgs[i]
+      if (msg.role === MessageRole.USER) {
+        let content = msg.content.trim()
+        if (content.length > 0) {
+          return content.length > 12 ? content.substring(0, 12) + '...' : content
+        }
+      }
+    }
+    return ''
+  }
+
+  /**
+   * 获取单个对话信息
+   */
+  async getConversationById(convId: number): Promise<Conversation | null> {
+    let store = await DatabaseHelper.getInstance().getStore()
+    let predicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+    predicates.equalTo('id', convId)
+    let resultSet = await store.query(predicates)
+    if (!resultSet.goToFirstRow()) {
+      resultSet.close()
+      return null
+    }
+    let conv = new Conversation()
+    conv.id = resultSet.getLong(resultSet.getColumnIndex('id'))
+    conv.title = resultSet.getString(resultSet.getColumnIndex('title'))
+    conv.summary = resultSet.getString(resultSet.getColumnIndex('summary'))
+    conv.modelType = resultSet.getString(resultSet.getColumnIndex('model_type'))
+    conv.lastMessageTime = resultSet.getLong(resultSet.getColumnIndex('last_message_time'))
+    conv.createTime = resultSet.getLong(resultSet.getColumnIndex('create_time'))
+    conv.messageCount = resultSet.getLong(resultSet.getColumnIndex('message_count'))
+    resultSet.close()
+    return conv
+  }
+
+  /**
+   * 清空对话消息计数（标记已读）
+   */
+  async clearMessageCount(convId: number): Promise<void> {
+    let store = await DatabaseHelper.getInstance().getStore()
     let valueBucket: relationalStore.ValuesBucket = {
-      'title': title,
-      'summary': summary,
-      'last_message_time': Date.now()
+      'message_count': 0
     }
     let predicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
     predicates.equalTo('id', convId)
@@ -91,6 +148,23 @@ export class ChatService {
       conv.lastMessageTime = resultSet.getLong(resultSet.getColumnIndex('last_message_time'))
       conv.createTime = resultSet.getLong(resultSet.getColumnIndex('create_time'))
       conv.messageCount = resultSet.getLong(resultSet.getColumnIndex('message_count'))
+
+      // 标题为空或为默认"新对话"时，自动根据首条用户消息生成
+      if ((!conv.title || conv.title === '新对话') && conv.id > 0) {
+        try {
+          let generatedTitle = await this.generateTitleFromMessages(conv.id)
+          if (generatedTitle) {
+            let titleBucket: relationalStore.ValuesBucket = { 'title': generatedTitle }
+            let titlePredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+            titlePredicates.equalTo('id', conv.id)
+            await store.update(titleBucket, titlePredicates)
+            conv.title = generatedTitle
+          }
+        } catch (err) {
+          // 生成失败不影响列表展示
+        }
+      }
+
       list.push(conv)
     }
     resultSet.close()
@@ -133,6 +207,23 @@ export class ChatService {
       conv.lastMessageTime = resultSet.getLong(resultSet.getColumnIndex('last_message_time'))
       conv.createTime = resultSet.getLong(resultSet.getColumnIndex('create_time'))
       conv.messageCount = resultSet.getLong(resultSet.getColumnIndex('message_count'))
+
+      // 标题为空或为默认"新对话"时，自动根据首条用户消息生成
+      if ((!conv.title || conv.title === '新对话') && conv.id > 0) {
+        try {
+          let generatedTitle = await this.generateTitleFromMessages(conv.id)
+          if (generatedTitle) {
+            let titleBucket: relationalStore.ValuesBucket = { 'title': generatedTitle }
+            let titlePredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+            titlePredicates.equalTo('id', conv.id)
+            await store.update(titleBucket, titlePredicates)
+            conv.title = generatedTitle
+          }
+        } catch (err) {
+          // 生成失败不影响列表展示
+        }
+      }
+
       list.push(conv)
     }
     resultSet.close()

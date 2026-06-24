@@ -78,6 +78,12 @@ struct ChatPage {
     }
     this.currentModelType = ChatService.getInstance().getCurrentModel()
     this.loadMessages()
+    // 进入对话后清空未读计数
+    if (this.conversationId > 0) {
+      ChatService.getInstance().clearMessageCount(this.conversationId).catch(() => {
+        // 忽略清空失败
+      })
+    }
   }
 
   aboutToDisappear(): void {
@@ -535,7 +541,8 @@ struct ChatPage {
 
       // 更新对话标题（失败不影响发送）
       try {
-        if (this.messages.length <= 2) {
+        let conv = await ChatService.getInstance().getConversationById(this.conversationId)
+        if (!conv || !conv.title || conv.title === '新对话') {
           let title = text.length > 15 ? text.substring(0, 15) + '...' : text
           await ChatService.getInstance().updateConversation(this.conversationId, title, '')
         }

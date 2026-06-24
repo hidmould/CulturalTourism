@@ -4,6 +4,11 @@
 import { http } from '@kit.NetworkKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 
+export interface StreamRequest {
+  request: http.HttpRequest
+  options: http.HttpRequestOptions
+}
+
 export class HttpClient {
   private static instance: HttpClient
 
@@ -84,10 +89,10 @@ export class HttpClient {
   }
 
   /**
-   * 流式 POST 请求（用于 SSE / 大模型流式输出）
-   * 返回 httpRequest 对象，由调用方监听 dataReceive 事件
+   * 创建流式 POST 请求对象（用于 SSE / 大模型流式输出）
+   * 返回 httpRequest 对象和请求选项，由调用方监听事件并执行 requestInStream
    */
-  createStreamRequest(url: string, body: string, headers?: Record<string, string>): http.HttpRequest {
+  createStreamRequest(headers?: Record<string, string>): StreamRequest {
     const httpRequest = http.createHttp()
     let defaultHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -99,13 +104,16 @@ export class HttpClient {
         defaultHeaders[key] = headers[key]
       })
     }
-    httpRequest.requestInStream(url, {
+    let options: http.HttpRequestOptions = {
       method: http.RequestMethod.POST,
       header: defaultHeaders,
-      extraData: body,
       connectTimeout: 60000,
       readTimeout: 120000
-    })
-    return httpRequest
+    }
+    let result: StreamRequest = {
+      request: httpRequest,
+      options: options
+    }
+    return result
   }
 }

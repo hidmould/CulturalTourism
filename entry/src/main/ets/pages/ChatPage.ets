@@ -441,64 +441,80 @@ struct ChatPage {
     this.inputText = ''
     this.isLoading = true
 
-    // 添加用户消息到列表
-    let userMsgId = await ChatService.getInstance().saveMessage(this.conversationId, MessageRole.USER, text)
-    this.messages.push({
-      id: userMsgId,
-      role: MessageRole.USER,
-      content: text,
-      isStreaming: false,
-      createTime: Date.now()
-    })
-
-    // 更新对话标题
-    if (this.messages.length <= 2) {
-      let title = text.length > 15 ? text.substring(0, 15) + '...' : text
-      await ChatService.getInstance().updateConversation(this.conversationId, title, '')
-    }
-
-    this.scrollToBottom()
-
-    // 如果是天气相关问题，先查询天气
-    let contextMessages = await this.buildContextMessages(text)
-
-    // 流式发送
-    this.isStreaming = true
-    this.streamingContent = ''
-
-    ChatService.getInstance().sendStreamMessage(
-      this.conversationId,
-      contextMessages,
-      (delta: string) => {
-        this.streamingContent += delta
-        this.scrollToBottom()
-      },
-      async (fullContent: string) => {
-        // 保存助手消息
-        let assistantMsgId = await ChatService.getInstance().saveMessage(
-          this.conversationId, MessageRole.ASSISTANT, fullContent
-        )
-        this.messages.push({
-          id: assistantMsgId,
-          role: MessageRole.ASSISTANT,
-          content: fullContent,
-          isStreaming: false,
-          createTime: Date.now()
-        })
-        this.streamingContent = ''
-        this.isStreaming = false
-        this.isLoading = false
-
-        // 更新对话摘要
-        let summary = fullContent.length > 50 ? fullContent.substring(0, 50) + '...' : fullContent
-        await ChatService.getInstance().updateConversation(this.conversationId, '', summary)
-      },
-      (error: string) => {
-        this.isStreaming = false
-        this.isLoading = false
-        promptAction.showToast({ message: error, duration: 2000 })
+    try {
+      // 确保对话存在
+      if (this.conversationId === 0) {
+        this.conversationId = await ChatService.getInstance().createConversation('新对话', ModelType.GENERAL)
       }
-    )
+
+      // 添加用户消息到列表
+      let userMsgId = await ChatService.getInstance().saveMessage(this.conversationId, MessageRole.USER, text)
+      this.messages.push({
+        id: userMsgId,
+        role: MessageRole.USER,
+        content: text,
+        isStreaming: false,
+        createTime: Date.now()
+      })
+
+      // 更新对话标题（失败不影响发送）
+      try {
+        if (this.messages.length <= 2) {
+          let title = text.length > 15 ? text.substring(0, 15) + '...' : text
+          await ChatService.getInstance().updateConversation(this.conversationId, title, '')
+        }
+      } catch (err) {
+        // 无关紧要
+      }
+
+      this.scrollToBottom()
+
+      // 如果是天气相关问题，先查询天气
+      let contextMessages = await this.buildContextMessages(text)
+
+      // 流式发送
+      this.isStreaming = true
+      this.streamingContent = ''
+
+      ChatService.getInstance().sendStreamMessage(
+        this.conversationId,
+        contextMessages,
+        (delta: string) => {
+          this.streamingContent += delta
+          this.scrollToBottom()
+        },
+        async (fullContent: string) => {
+          // 保存助手消息
+          let assistantMsgId = await ChatService.getInstance().saveMessage(
+            this.conversationId, MessageRole.ASSISTANT, fullContent
+          )
+          this.messages.push({
+            id: assistantMsgId,
+            role: MessageRole.ASSISTANT,
+            content: fullContent,
+            isStreaming: false,
+            createTime: Date.now()
+          })
+          this.streamingContent = ''
+          this.isStreaming = false
+          this.isLoading = false
+
+          // 更新对话摘要
+          let summary = fullContent.length > 50 ? fullContent.substring(0, 50) + '...' : fullContent
+          await ChatService.getInstance().updateConversation(this.conversationId, '', summary)
+        },
+        (error: string) => {
+          this.isStreaming = false
+          this.isLoading = false
+          promptAction.showToast({ message: error, duration: 2000 })
+        }
+      )
+    } catch (err) {
+      this.isStreaming = false
+      this.isLoading = false
+      let errObj = err as Error
+      promptAction.showToast({ message: '发送失败: ' + (errObj.message || JSON.stringify(err)), duration: 3000 })
+    }
   }
 
   async buildContextMessages(userText: string): Promise<Record<string, string>[]> {

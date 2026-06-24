@@ -33,6 +33,14 @@ export class DatabaseHelper {
 
   async getStore(): Promise<relationalStore.RdbStore> {
     if (this.store) {
+      // 确保表存在（修复部分初始化失败导致的表缺失）
+      try {
+        await this.createTables()
+      } catch (err) {
+        this.store = null
+        let error = err as BusinessError
+        throw new Error('数据库表创建失败: ' + error.message)
+      }
       return this.store
     }
     if (!this.context) {
@@ -45,11 +53,13 @@ export class DatabaseHelper {
     }
 
     try {
-      this.store = await relationalStore.getRdbStore(this.context, config)
+      let store = await relationalStore.getRdbStore(this.context, config)
+      this.store = store
       await this.createTables()
       await this.initScenicSpots()
       return this.store
     } catch (err) {
+      this.store = null
       let error = err as BusinessError
       throw new Error(`数据库初始化失败: ${error.message}`)
     }

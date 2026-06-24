@@ -6,8 +6,8 @@
 
 // DeepSeek V3 大模型
 export const DEEPSEEK_API_KEY = 'giREkmEsO_9FoMuu2v_nI3T3aHcgAu_3fe6EuYVPmTkRt-M24L-dxuYfpbCfccPBrj9G8oBTYOgZjnuILmaKPQ'
-export const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions'
-export const DEEPSEEK_MODEL = 'deepseek-chat'
+export const DEEPSEEK_API_URL = 'https://api.modelarts-maas.com/v2/chat/completions'
+export const DEEPSEEK_MODEL = 'DeepSeek-V3'
 
 // 高德天气 API
 export const AMAP_WEATHER_KEY = '2f7da6fcd4c6722c58547d6de02f804c'
@@ -15,8 +15,8 @@ export const AMAP_WEATHER_URL = 'https://restapi.amap.com/v3/weather/weatherInfo
 
 // 旅游垂直模型（可配置多个大模型）
 export const TRAVEL_MODEL_API_KEY = 'giREkmEsO_9FoMuu2v_nI3T3aHcgAu_3fe6EuYVPmTkRt-M24L-dxuYfpbCfccPBrj9G8oBTYOgZjnuILmaKPQ'
-export const TRAVEL_MODEL_API_URL = 'https://api.deepseek.com/v1/chat/completions'
-export const TRAVEL_MODEL_NAME = 'deepseek-chat'
+export const TRAVEL_MODEL_API_URL = 'https://api.modelarts-maas.com/v2/chat/completions'
+export const TRAVEL_MODEL_NAME = 'DeepSeek-V3'
 
 // ==================== 数据库配置 ====================
 

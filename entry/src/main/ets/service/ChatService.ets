@@ -2,7 +2,6 @@
  * 大模型对话服务 - 流式对话、多模型切换、上下文记忆
  */
 import { HttpClient } from '../network/HttpClient'
-import { http } from '@kit.NetworkKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { util } from '@kit.ArkTS'
 import { DatabaseHelper } from '../database/DatabaseHelper'
@@ -173,25 +172,51 @@ export class ChatService {
       'content': content,
       'create_time': Date.now()
     }
-    let rowId = await store.insert(TABLE_MESSAGE, valueBucket)
+    let rowId: number
 
-    // 更新对话消息计数 - 先查询当前计数
-    let convPredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
-    convPredicates.equalTo('id', convId)
-    let resultSet = await store.query(convPredicates)
-    let currentCount: number = 0
-    if (resultSet.goToFirstRow()) {
-      currentCount = resultSet.getLong(resultSet.getColumnIndex('message_count'))
+    try {
+      rowId = await store.insert(TABLE_MESSAGE, valueBucket)
+    } catch (err) {
+      // 表可能损坏或列不匹配，重建表后重试
+      try {
+        await store.executeSql(`DROP TABLE IF EXISTS ${TABLE_MESSAGE}`)
+      } catch (e) {
+        // 忽略
+      }
+      await store.executeSql(`CREATE TABLE IF NOT EXISTS ${TABLE_MESSAGE} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT DEFAULT '',
+        create_time INTEGER DEFAULT 0
+      )`)
+      rowId = await store.insert(TABLE_MESSAGE, valueBucket)
     }
-    resultSet.close()
 
-    let updateBucket: relationalStore.ValuesBucket = {
-      'last_message_time': Date.now(),
-      'message_count': currentCount + 1
+    // 更新对话消息计数（失败不影响消息保存）
+    try {
+      let convPredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+      convPredicates.equalTo('id', convId)
+      let resultSet = await store.query(convPredicates)
+      let currentCount: number = 0
+      if (resultSet.goToFirstRow()) {
+        let colIndex = resultSet.getColumnIndex('message_count')
+        if (colIndex >= 0) {
+          currentCount = resultSet.getLong(colIndex)
+        }
+      }
+      resultSet.close()
+
+      let updateBucket: relationalStore.ValuesBucket = {
+        'last_message_time': Date.now(),
+        'message_count': currentCount + 1
+      }
+      convPredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
+      convPredicates.equalTo('id', convId)
+      await store.update(updateBucket, convPredicates)
+    } catch (err) {
+      // 更新计数失败不影响消息保存
     }
-    convPredicates = new relationalStore.RdbPredicates(TABLE_CONVERSATION)
-    convPredicates.equalTo('id', convId)
-    await store.update(updateBucket, convPredicates)
 
     return rowId
   }
@@ -246,10 +271,44 @@ export class ChatService {
       'Accept': 'text/event-stream'
     }
 
-    let httpRequest = HttpClient.getInstance().createStreamRequest(config.apiUrl, body, headers)
+    let streamReq = HttpClient.getInstance().createStreamRequest(headers)
+    let httpRequest = streamReq.request
+    let options = streamReq.options
+    options.extraData = body
     let fullContent = ''
+    let hasError = false
+    let hasReceivedData = false
+    let hasDone = false
+
+    // 15秒首包超时兜底：若一直未收到任何数据则自动失败
+    let firstByteTimeoutId = setTimeout(() => {
+      if (!hasReceivedData && !hasError) {
+        hasError = true
+        httpRequest.destroy()
+        onError('请求超时，请检查网络连接或API配置')
+      }
+    }, 15000)
+
+    // 60秒总超时兜底：防止流永不结束
+    let totalTimeoutId = setTimeout(() => {
+      if (!hasDone && !hasError) {
+        hasError = true
+        httpRequest.destroy()
+        if (fullContent.length > 0) {
+          onDone(fullContent)
+        } else {
+          onError('请求超时，未收到完整回复')
+        }
+      }
+    }, 60000)
+
+    // 记录响应头（调试用）
+    httpRequest.on('headersReceive', (header: Object) => {
+      console.info('[ChatService] headersReceive: ' + JSON.stringify(header))
+    })
 
     httpRequest.on('dataReceive', (data: ArrayBuffer) => {
+      hasReceivedData = true
       let decoder = new util.TextDecoder()
       let uint8Data = new Uint8Array(data)
       let text = decoder.decode(uint8Data)
@@ -260,7 +319,14 @@ export class ChatService {
         if (line.startsWith('data: ')) {
           let jsonStr = line.substring(6)
           if (jsonStr === '[DONE]') {
-            continue
+            if (!hasDone) {
+              hasDone = true
+              clearTimeout(firstByteTimeoutId)
+              clearTimeout(totalTimeoutId)
+              httpRequest.destroy()
+              onDone(fullContent)
+            }
+            return
           }
           try {
             let json = JSON.parse(jsonStr) as Record<string, Object>
@@ -284,8 +350,24 @@ export class ChatService {
     })
 
     httpRequest.on('dataEnd', () => {
+      if (hasError || hasDone) {
+        return
+      }
+      clearTimeout(firstByteTimeoutId)
+      clearTimeout(totalTimeoutId)
       httpRequest.destroy()
       onDone(fullContent)
+    })
+
+    httpRequest.requestInStream(config.apiUrl, options).catch((err: Object) => {
+      if (!hasError) {
+        hasError = true
+        clearTimeout(firstByteTimeoutId)
+        clearTimeout(totalTimeoutId)
+        httpRequest.destroy()
+        let error = err as BusinessError
+        onError(`网络请求失败: ${error.message || JSON.stringify(err)}`)
+      }
     })
   }
 }

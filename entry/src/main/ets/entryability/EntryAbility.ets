@@ -18,6 +18,13 @@ export default class EntryAbility extends UIAbility {
     // 初始化服务
     DatabaseHelper.getInstance().init(this.context)
     UserService.getInstance().init(this.context)
+
+    // 主动预初始化数据库（含景点数据），避免 Tab 切换时首次查询为空
+    DatabaseHelper.getInstance().getStore().then(() => {
+      hilog.info(DOMAIN, 'testTag', '数据库预初始化完成')
+    }).catch((err: Error) => {
+      hilog.error(DOMAIN, 'testTag', '数据库预初始化失败: %{public}s', err.message)
+    })
   }
 
   onDestroy(): void {

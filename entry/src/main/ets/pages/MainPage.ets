@@ -280,6 +280,7 @@ struct DiscoverContent {
   @State selectedCategory: string = '全部'
   @State spots: ScenicSpot[] = []
   @State isLoading: boolean = false
+  @State errorMsg: string = ''
 
   aboutToAppear(): void {
     this.loadSpots()
@@ -287,11 +288,13 @@ struct DiscoverContent {
 
   async loadSpots(): Promise<void> {
     this.isLoading = true
+    this.errorMsg = ''
     try {
       this.spots = await ScenicService.getInstance().getAllSpots()
       console.info(`[DiscoverContent] 加载景点完成，数量: ${this.spots.length}`)
     } catch (err) {
       let error = err as Error
+      this.errorMsg = error.message
       console.error(`[DiscoverContent] 加载景点失败: ${error.message}`)
     } finally {
       this.isLoading = false
@@ -422,10 +425,13 @@ struct DiscoverContent {
             .fontSize(16)
             .fontColor('#999999')
             .margin({ top: 12 })
-          Text('数据加载异常，请清除应用数据后重试')
+          Text(this.errorMsg || '数据加载异常，请清除应用数据后重试')
             .fontSize(12)
             .fontColor('#CCCCCC')
             .margin({ top: 6 })
+            .maxLines(3)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .padding({ left: 24, right: 24 })
           Button('重新加载')
             .fontSize(13)
             .height(36)
@@ -461,18 +467,15 @@ struct DiscoverContent {
   @Builder
   buildSpotCard(spot: ScenicSpot) {
     Column() {
-      // 景点图片占位
-      Row() {
-        Text(spot.name.substring(0, 1))
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-      }
-      .width('100%')
-      .height(120)
-      .backgroundColor(this.getCategoryColor(spot.category))
-      .justifyContent(FlexAlign.Center)
-      .borderRadius({ topLeft: 12, topRight: 12 })
+      // 景点独立图片（rawfile 动态加载）
+      Image($rawfile(spot.imageUrl + '.png'))
+        .width('100%')
+        .height(120)
+        .objectFit(ImageFit.Cover)
+        .borderRadius({ topLeft: 12, topRight: 12 })
+        .onError((err) => {
+          // 图片加载失败时静默处理，使用 Image 默认占位
+        })
 
       Column() {
         Row() {

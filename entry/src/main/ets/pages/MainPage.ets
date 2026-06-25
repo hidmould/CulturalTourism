@@ -16,6 +16,7 @@ struct MainPage {
   @State conversations: Conversation[] = []
   @State searchKeyword: string = ''
   @State isLoading: boolean = false
+  @State refreshProfile: number = 0
 
   private tabsController: TabsController = new TabsController()
 
@@ -25,6 +26,8 @@ struct MainPage {
 
   onPageShow(): void {
     this.loadConversations()
+    // 触发我的页面刷新个人信息
+    this.refreshProfile++
   }
 
   async loadConversations(): Promise<void> {
@@ -54,7 +57,7 @@ struct MainPage {
 
       // Tab 3: 我的
       TabContent() {
-        ProfileContent()
+        ProfileContent({ refreshTrigger: this.refreshProfile })
       }
       .tabBar(this.buildTabBar('我的', 2))
     }
@@ -559,8 +562,14 @@ struct DiscoverContent {
 struct ProfileContent {
   @State userInfo: UserInfo = new UserInfo()
   @State isLoading: boolean = false
+  @Prop @Watch('onRefresh') refreshTrigger: number = 0
 
   aboutToAppear(): void {
+    this.loadUserInfo()
+  }
+
+  // 监听 refreshTrigger 变化，重新加载用户信息，解决修改后不刷新问题
+  onRefresh(): void {
     this.loadUserInfo()
   }
 
@@ -581,17 +590,28 @@ struct ProfileContent {
       Column() {
         Row() {
           // 头像
-          Text(this.userInfo.nickname ? this.userInfo.nickname.substring(0, 1) : '?')
-            .fontSize(24)
-            .fontColor('#FFFFFF')
-            .width(60)
-            .height(60)
-            .backgroundColor('#1E90FF')
-            .borderRadius(30)
-            .textAlign(TextAlign.Center)
-            .onClick(() => {
-              router.pushUrl({ url: 'pages/ProfilePage' })
-            })
+          if (this.userInfo.avatar && this.userInfo.avatar.startsWith('file://')) {
+            Image(this.userInfo.avatar)
+              .width(60)
+              .height(60)
+              .borderRadius(30)
+              .objectFit(ImageFit.Cover)
+              .onClick(() => {
+                router.pushUrl({ url: 'pages/ProfilePage' })
+              })
+          } else {
+            Text(this.userInfo.nickname ? this.userInfo.nickname.substring(0, 1) : '?')
+              .fontSize(24)
+              .fontColor('#FFFFFF')
+              .width(60)
+              .height(60)
+              .backgroundColor(this.userInfo.avatar || '#1E90FF')
+              .borderRadius(30)
+              .textAlign(TextAlign.Center)
+              .onClick(() => {
+                router.pushUrl({ url: 'pages/ProfilePage' })
+              })
+          }
 
           Column() {
             Text(this.userInfo.nickname || '未设置昵称')

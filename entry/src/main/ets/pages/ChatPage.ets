@@ -680,6 +680,7 @@ struct ChatPage {
       )
       promptAction.showToast({ message: '已收藏', duration: 1500 })
     } catch (err) {
+      console.error('[ChatPage] 收藏失败: ' + JSON.stringify(err))
       promptAction.showToast({ message: '收藏失败', duration: 1500 })
     }
   }
@@ -696,6 +697,7 @@ struct ChatPage {
       )
       promptAction.showToast({ message: '已加入行程清单', duration: 1500 })
     } catch (err) {
+      console.error('[ChatPage] 加入行程失败: ' + JSON.stringify(err))
       promptAction.showToast({ message: '添加失败', duration: 1500 })
     }
   }

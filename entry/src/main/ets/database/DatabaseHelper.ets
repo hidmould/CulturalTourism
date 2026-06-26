@@ -19,6 +19,7 @@ export class DatabaseHelper {
   private static instance: DatabaseHelper
   private store: relationalStore.RdbStore | null = null
   private context: common.UIAbilityContext | null = null
+  private initPromise: Promise<relationalStore.RdbStore> | null = null
 
   static getInstance(): DatabaseHelper {
     if (!DatabaseHelper.instance) {
@@ -33,22 +34,11 @@ export class DatabaseHelper {
 
   async getStore(): Promise<relationalStore.RdbStore> {
     if (this.store) {
-      // 确保表存在（修复部分初始化失败导致的表缺失）
-      try {
-        await this.createTables()
-      } catch (err) {
-        this.store = null
-        let error = err as BusinessError
-        throw new Error('数据库表创建失败: ' + error.message)
-      }
-      // 景点数据初始化失败不影响核心功能
-      try {
-        await this.initScenicSpots()
-      } catch (err) {
-        let error = err as BusinessError
-        console.error(`[DatabaseHelper] 景点数据初始化失败: ${error.message}`)
-      }
       return this.store
+    }
+    // 防止并发初始化
+    if (this.initPromise) {
+      return this.initPromise
     }
     if (!this.context) {
       throw new Error('DatabaseHelper 未初始化，请先调用 init()')
@@ -56,13 +46,23 @@ export class DatabaseHelper {
 
     console.info('[DatabaseHelper] 开始创建 RDB 数据库...')
 
+    this.initPromise = this.doInitStore()
+    try {
+      let store = await this.initPromise
+      return store
+    } finally {
+      this.initPromise = null
+    }
+  }
+
+  private async doInitStore(): Promise<relationalStore.RdbStore> {
     const config: relationalStore.StoreConfig = {
       name: DB_NAME,
       securityLevel: relationalStore.SecurityLevel.S1
     }
 
     try {
-      let store = await relationalStore.getRdbStore(this.context, config)
+      let store = await relationalStore.getRdbStore(this.context!, config)
       this.store = store
       console.info('[DatabaseHelper] RDB 数据库创建成功')
       await this.createTables()

@@ -28,7 +28,25 @@ export class FavoriteService {
       'type': type,
       'create_time': Date.now()
     }
-    return await store.insert(TABLE_FAVORITE, valueBucket)
+    try {
+      return await store.insert(TABLE_FAVORITE, valueBucket)
+    } catch (err) {
+      console.error('[FavoriteService] 插入失败，重建表后重试: ' + JSON.stringify(err))
+      try {
+        await store.executeSql(`DROP TABLE IF EXISTS ${TABLE_FAVORITE}`)
+      } catch (e) {
+        // 忽略
+      }
+      await store.executeSql(`CREATE TABLE IF NOT EXISTS ${TABLE_FAVORITE} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_id INTEGER DEFAULT 0,
+        conversation_id INTEGER DEFAULT 0,
+        content TEXT DEFAULT '',
+        type TEXT DEFAULT '',
+        create_time INTEGER DEFAULT 0
+      )`)
+      return await store.insert(TABLE_FAVORITE, valueBucket)
+    }
   }
 
   /**

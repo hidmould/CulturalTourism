@@ -35,7 +35,28 @@ export class TripService {
       'create_time': Date.now(),
       'update_time': Date.now()
     }
-    return await store.insert(TABLE_TRIP, valueBucket)
+    try {
+      return await store.insert(TABLE_TRIP, valueBucket)
+    } catch (err) {
+      console.error('[TripService] 插入失败，重建表后重试: ' + JSON.stringify(err))
+      try {
+        await store.executeSql(`DROP TABLE IF EXISTS ${TABLE_TRIP}`)
+      } catch (e) {
+        // 忽略
+      }
+      await store.executeSql(`CREATE TABLE IF NOT EXISTS ${TABLE_TRIP} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT DEFAULT '',
+        day_index INTEGER DEFAULT 0,
+        sort_order INTEGER DEFAULT 0,
+        content TEXT DEFAULT '',
+        city TEXT DEFAULT '',
+        duration INTEGER DEFAULT 0,
+        create_time INTEGER DEFAULT 0,
+        update_time INTEGER DEFAULT 0
+      )`)
+      return await store.insert(TABLE_TRIP, valueBucket)
+    }
   }
 
   /**
@@ -117,14 +138,22 @@ export class TripService {
 
   private async getMaxSortOrder(): Promise<number> {
     let store = await DatabaseHelper.getInstance().getStore()
-    let sql = `SELECT MAX(sort_order) as max_order FROM ${TABLE_TRIP}`
-    let resultSet = await store.querySql(sql)
-    let maxOrder = 0
-    if (resultSet.goToFirstRow()) {
-      maxOrder = resultSet.getLong(resultSet.getColumnIndex('max_order'))
+    try {
+      let sql = `SELECT MAX(sort_order) as max_order FROM ${TABLE_TRIP}`
+      let resultSet = await store.querySql(sql)
+      let maxOrder = 0
+      if (resultSet.goToFirstRow()) {
+        let colIndex = resultSet.getColumnIndex('max_order')
+        if (colIndex >= 0) {
+          maxOrder = resultSet.getLong(colIndex)
+        }
+      }
+      resultSet.close()
+      return maxOrder
+    } catch (err) {
+      console.error('[TripService] getMaxSortOrder 失败: ' + JSON.stringify(err))
+      return 0
     }
-    resultSet.close()
-    return maxOrder
   }
 
   private parseTrip(resultSet: relationalStore.ResultSet): TripItem {

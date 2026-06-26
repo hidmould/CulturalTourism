@@ -15,6 +15,7 @@ struct TripDetailPage {
   @State newTripTitle: string = ''
   @State newTripCity: string = ''
   @State newTripDays: number = 1
+  @State expandedTripIds: number[] = []
 
   aboutToAppear(): void {
     this.loadTrips()
@@ -142,10 +143,34 @@ struct TripDetailPage {
         Text(item.content)
           .fontSize(12)
           .fontColor('#666666')
-          .maxLines(2)
+          .maxLines(this.expandedTripIds.includes(item.id) ? 999 : 2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ top: 6 })
           .width('100%')
+          .onClick(() => {
+            if (this.expandedTripIds.includes(item.id)) {
+              this.expandedTripIds = this.expandedTripIds.filter(id => id !== item.id)
+            } else {
+              this.expandedTripIds.push(item.id)
+              this.expandedTripIds = [...this.expandedTripIds]
+            }
+          })
+
+        if (item.content.length > 30) {
+          Text(this.expandedTripIds.includes(item.id) ? '收起' : '展开全文')
+            .fontSize(12)
+            .fontColor('#1E90FF')
+            .margin({ top: 4 })
+            .width('100%')
+            .onClick(() => {
+              if (this.expandedTripIds.includes(item.id)) {
+                this.expandedTripIds = this.expandedTripIds.filter(id => id !== item.id)
+              } else {
+                this.expandedTripIds.push(item.id)
+                this.expandedTripIds = [...this.expandedTripIds]
+              }
+            })
+        }
       }
 
       Row() {

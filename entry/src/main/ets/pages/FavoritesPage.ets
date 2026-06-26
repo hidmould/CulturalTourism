@@ -12,6 +12,7 @@ struct FavoritesPage {
   @State favorites: Favorite[] = []
   @State isLoading: boolean = false
   @State selectedType: string = '全部'
+  @State expandedIds: number[] = []
 
   aboutToAppear(): void {
     this.loadFavorites()
@@ -130,10 +131,34 @@ struct FavoritesPage {
       Text(item.content)
         .fontSize(13)
         .fontColor('#333333')
-        .maxLines(3)
+        .maxLines(this.expandedIds.includes(item.id) ? 999 : 3)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .margin({ top: 8 })
         .width('100%')
+        .onClick(() => {
+          if (this.expandedIds.includes(item.id)) {
+            this.expandedIds = this.expandedIds.filter(id => id !== item.id)
+          } else {
+            this.expandedIds.push(item.id)
+            this.expandedIds = [...this.expandedIds]
+          }
+        })
+
+      if (item.content.length > 50) {
+        Text(this.expandedIds.includes(item.id) ? '收起' : '展开全文')
+          .fontSize(12)
+          .fontColor('#1E90FF')
+          .margin({ top: 4 })
+          .width('100%')
+          .onClick(() => {
+            if (this.expandedIds.includes(item.id)) {
+              this.expandedIds = this.expandedIds.filter(id => id !== item.id)
+            } else {
+              this.expandedIds.push(item.id)
+              this.expandedIds = [...this.expandedIds]
+            }
+          })
+      }
     }
     .width('100%')
     .padding(12)

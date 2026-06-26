@@ -48,6 +48,42 @@ export class UserService {
   }
 
   /**
+   * 注册新用户
+   */
+  async register(phone: string, password: string, nickname?: string): Promise<boolean> {
+    let prefs = await this.getPrefs()
+    let savedPassword = await prefs.get(PREF_KEY_PASSWORD, '') as string
+
+    // 检查手机号是否已注册
+    if (savedPassword !== '') {
+      let savedPhone = await prefs.get(PREF_KEY_PHONE, '') as string
+      if (savedPhone === phone) {
+        throw new Error('该手机号已注册')
+      }
+    }
+
+    // 保存密码
+    await prefs.put(PREF_KEY_PASSWORD, password)
+    await prefs.put(PREF_KEY_PHONE, phone)
+
+    // 生成 token
+    let token = `token_${phone}_${Date.now()}`
+    await prefs.put(PREF_KEY_TOKEN, token)
+    await prefs.put(PREF_KEY_AUTO_LOGIN, true)
+
+    // 保存昵称
+    if (nickname && nickname.trim().length > 0) {
+      await prefs.put(PREF_KEY_NICKNAME, nickname.trim())
+    }
+
+    await prefs.flush()
+
+    // 保存用户到数据库
+    await this.ensureUserInDb(phone, nickname)
+    return true
+  }
+
+  /**
    * 手机号+验证码登录（模拟验证码为 123456）
    */
   async loginByPhone(phone: string, code: string): Promise<boolean> {
@@ -241,16 +277,19 @@ export class UserService {
   /**
    * 确保用户在数据库中存在
    */
-  private async ensureUserInDb(phone: string): Promise<void> {
+  private async ensureUserInDb(phone: string, nickname?: string): Promise<void> {
     let store = await DatabaseHelper.getInstance().getStore()
     let predicates = new relationalStore.RdbPredicates(TABLE_USER)
     predicates.equalTo('phone', phone)
     let resultSet = await store.query(predicates)
 
     if (resultSet.rowCount === 0) {
+      let displayName = (nickname && nickname.trim().length > 0)
+        ? nickname.trim()
+        : `用户${phone.substring(phone.length - 4)}`
       let valueBucket: relationalStore.ValuesBucket = {
         'phone': phone,
-        'nickname': `用户${phone.substring(phone.length - 4)}`,
+        'nickname': displayName,
         'create_time': Date.now()
       }
       await store.insert(TABLE_USER, valueBucket)

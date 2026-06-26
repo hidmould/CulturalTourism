@@ -185,6 +185,21 @@ struct LoginPage {
 
       Blank()
 
+      // 注册入口
+      Row() {
+        Text('没有账号？')
+          .fontSize(13)
+          .fontColor('#999999')
+        Text('立即注册')
+          .fontSize(13)
+          .fontColor('#1E90FF')
+          .fontWeight(FontWeight.Medium)
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/RegisterPage' })
+          })
+      }
+      .margin({ bottom: 10 })
+
       Text('登录即表示同意《用户协议》和《隐私政策》')
         .fontSize(11)
         .fontColor('#999999')

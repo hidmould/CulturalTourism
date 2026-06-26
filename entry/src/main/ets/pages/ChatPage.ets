@@ -308,39 +308,36 @@ struct ChatPage {
         Blank()
       }
 
-      Column() {
-        if (item.role === MessageRole.ASSISTANT) {
-          // AI 头像
-          Text('AI')
-            .fontSize(11)
-            .fontColor('#FFFFFF')
-            .width(28)
-            .height(28)
-            .backgroundColor('#1E90FF')
-            .borderRadius(14)
-            .textAlign(TextAlign.Center)
-            .margin({ bottom: 2 })
-        }
-
-        Text(item.content)
-          .fontSize(14)
-          .fontColor(item.role === MessageRole.USER ? '#FFFFFF' : '#333333')
-          .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-          .backgroundColor(item.role === MessageRole.USER ? '#1E90FF' : '#FFFFFF')
-          .borderRadius(12)
-          .constraintSize({ maxWidth: '75%' })
-          .textAlign(TextAlign.Start)
-          .gesture(
-            LongPressGesture()
-              .onAction(() => {
-                if (item.role === MessageRole.ASSISTANT) {
-                  this.selectedMessage = item
-                  this.showActionSheet = true
-                }
-              })
-          )
+      if (item.role === MessageRole.ASSISTANT) {
+        // AI 头像
+        Text('AI')
+          .fontSize(11)
+          .fontColor('#FFFFFF')
+          .width(28)
+          .height(28)
+          .backgroundColor('#1E90FF')
+          .borderRadius(14)
+          .textAlign(TextAlign.Center)
+          .margin({ right: 8 })
       }
-      .alignItems(item.role === MessageRole.USER ? HorizontalAlign.End : HorizontalAlign.Start)
+
+      Text(item.content)
+        .fontSize(14)
+        .fontColor(item.role === MessageRole.USER ? '#FFFFFF' : '#333333')
+        .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+        .backgroundColor(item.role === MessageRole.USER ? '#1E90FF' : '#FFFFFF')
+        .borderRadius(12)
+        .constraintSize({ maxWidth: '75%' })
+        .textAlign(TextAlign.Start)
+        .gesture(
+          LongPressGesture()
+            .onAction(() => {
+              if (item.role === MessageRole.ASSISTANT) {
+                this.selectedMessage = item
+                this.showActionSheet = true
+              }
+            })
+        )
 
       if (item.role === MessageRole.ASSISTANT) {
         Blank()
@@ -348,6 +345,7 @@ struct ChatPage {
     }
     .width('100%')
     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+    .alignItems(VerticalAlign.Top)
     .justifyContent(item.role === MessageRole.USER ? FlexAlign.End : FlexAlign.Start)
   }
 
@@ -362,7 +360,7 @@ struct ChatPage {
         .backgroundColor('#1E90FF')
         .borderRadius(14)
         .textAlign(TextAlign.Center)
-        .margin({ bottom: 2 })
+        .margin({ right: 8 })
 
       Text(this.streamingContent + '|')
         .fontSize(14)
@@ -372,9 +370,12 @@ struct ChatPage {
         .borderRadius(12)
         .constraintSize({ maxWidth: '75%' })
         .textAlign(TextAlign.Start)
+
+      Blank()
     }
     .width('100%')
     .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+    .alignItems(VerticalAlign.Top)
     .justifyContent(FlexAlign.Start)
   }
 

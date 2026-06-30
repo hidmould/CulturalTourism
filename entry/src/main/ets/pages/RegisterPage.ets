@@ -21,7 +21,7 @@ struct RegisterPage {
         Text('创建账号')
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
+           .fontColor('#FFFFFF')
           .margin({ top: 40 })
         Text('注册智慧文旅，开启智能旅行')
           .fontSize(14)

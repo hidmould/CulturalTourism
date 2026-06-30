@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "智慧文旅"
+    },
+    {
+      "name": "location_reason",
+      "value": "用于获取当前位置，帮助您自动设置常住城市"
     }
   ]
 }

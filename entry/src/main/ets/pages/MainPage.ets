@@ -8,6 +8,7 @@ import { ScenicService } from '../service/ScenicService'
 import { UserService } from '../service/UserService'
 import { Conversation, ScenicSpot, UserInfo } from '../model/Models'
 import { ModelType } from '../common/Constants'
+import { getSpotImageResource } from '../common/RawfileUtil'
 
 @Entry
 @Component
@@ -470,8 +471,8 @@ struct DiscoverContent {
   @Builder
   buildSpotCard(spot: ScenicSpot) {
     Column() {
-      // 景点独立图片（rawfile 动态加载）
-      Image($rawfile(spot.imageUrl + '.png'))
+      // 景点独立图片（通过 RawfileUtil 映射为 Resource，避免 $rawfile 不支持运行时拼接）
+      Image(getSpotImageResource(spot.imageUrl))
         .width('100%')
         .height(120)
         .objectFit(ImageFit.Cover)
